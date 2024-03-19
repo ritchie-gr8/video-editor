@@ -7,12 +7,12 @@ const db = require("../DB")
 const FF = require("../../lib/FF")
 
 const getVideos = (req, res, handleErr) => {
-    const name = req.params.get("name")
-    if (name) {
-        res.json({ message: `Your name is ${name}` })
-    } else {
-        return handleErr({ status: 400, message: "Please specify a name" })
-    }
+    db.update()
+    const videos = db.videos.filter(video => {
+        return video.userId === req.userId
+    })
+
+    res.status(200).json(videos)
 }
 
 const uploadVideo = async (req, res, handleErr) => {
@@ -72,9 +72,78 @@ const uploadVideo = async (req, res, handleErr) => {
 
 }
 
+// return video asset to the client
+const getVideoAsset = async (req, res, handleErr) => {
+
+    const videoId = req.params.get("videoId")
+    const type = req.params.get("type")
+
+    db.update()
+    const video = db.videos.find(video => video.videoId === videoId)
+
+    if (!video) {
+        return handleErr({
+            status: 404,
+            message: "Video not found!"
+        })
+    }
+
+    let file
+    let mimeType
+    let fileName // final file name for the download (including the extension)
+
+    switch (type) {
+        case "thumbnail":
+            file = await fs.open(`./storage/${videoId}/thumbnail.jpg`, 'r')
+            mimeType = 'image/jpeg'
+            break
+        case "audio":
+            file = await fs.open(`./storage/${videoId}/audio.aac`, 'r')
+            mimeType = 'audio/aac'
+            fileName = `${video.name}-audio.aac`
+            break
+        case "resize":
+            const dimensions = req.params.get("dimensions")
+            file = await fs.open(`./storage/${videoId}/${dimensions}.${video.extension}`, 'r')
+            mimeType = `video/${video.extension === 'mp4' ? 'mp4' : 'quicktime'}`
+            fileName = `${video.name}-${dimensions}.${video.extension}`
+            break
+        case "original":
+            file = await fs.open(`./storage/${videoId}/original.${video.extension}`, 'r')
+            mimeType = `video/${video.extension === 'mp4' ? 'mp4' : 'quicktime'}`
+            fileName = `${video.name}.${video.extension}`
+            break
+    }
+
+    try {
+
+        // grab the file size
+        const stat = await file.stat()
+        const fileStream = file.createReadStream()
+
+        if (type !== 'thumbnail') {
+            // set a header to prompt for download
+            res.setHeader("Content-Disposition", `attachment; filename=${fileName}`)
+        }
+
+        // set the headers based on the file type
+        res.setHeader("Content-Type", mimeType)
+        res.setHeader("Content-Length", stat.size)
+
+        res.status(200)
+
+        await pipeline(fileStream, res)
+
+        file.close()
+    } catch (error) {
+        console.log(error)
+    }
+}
+
 const controller = {
     getVideos,
-    uploadVideo
+    uploadVideo,
+    getVideoAsset
 }
 
 module.exports = controller
