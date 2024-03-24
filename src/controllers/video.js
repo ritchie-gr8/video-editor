@@ -5,6 +5,9 @@ const { pipeline } = require("node:stream/promises")
 const util = require("../../lib/util")
 const db = require("../DB")
 const FF = require("../../lib/FF")
+const JobQueue = require("../../lib/jobQueue")
+
+const jobs = new JobQueue()
 
 const getVideos = (req, res, handleErr) => {
     db.update()
@@ -148,33 +151,22 @@ const resizeVideo = async (req, res, handleErr) => {
 
     db.update()
     const video = db.videos.find(vid => vid.videoId === videoId)
-
     video.resizes[`${width}x${height}`] = { processing: true }
+    db.save()
 
-    const originalVideoPath = `./storage/${videoId}/original.${video.extension}`
-    const targetVideoPath = `./storage/${videoId}/${width}x${height}.${video.extension}`
+    jobs.enqueue({
+        type: "resize",
+        videoId,
+        width,
+        height,
+    })
 
-    try {
+    res.status(200).json({
+        status: "success",
+        message: "The video is now being processed"
+    })
 
-        await FF.resize(
-            originalVideoPath,
-            targetVideoPath,
-            width,
-            height,
-        )
 
-        video.resizes[`${width}x${height}`].processing = false
-        db.save()
-
-        res.status(200).json({
-            status: "success",
-            message: "The video is now being processed"
-        })
-
-    } catch (error) {
-        util.deleteFile(targetVideoPath)
-        return handleErr(error)
-    }
 }
 
 // extract audio from video file (can only be done once)
