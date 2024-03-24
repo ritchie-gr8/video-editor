@@ -30,6 +30,7 @@ module.exports = (server) => {
   server.route("post", "/api/upload-video", Video.uploadVideo)
 
 
+  // extract audio from video file (can only be done once)
   server.route("patch", "/api/video/extract-audio", Video.extractAudio)
 
   // return video asset to the client
