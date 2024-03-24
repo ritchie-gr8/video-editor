@@ -140,6 +140,44 @@ const getVideoAsset = async (req, res, handleErr) => {
     }
 }
 
+// resize a video file (creates a new video file)
+const resizeVideo = async (req, res, handleErr) => {
+    const videoId = req.body.videoId
+    const width = Number(req.body.width)
+    const height = Number(req.body.height)
+
+    db.update()
+    const video = db.videos.find(vid => vid.videoId === videoId)
+
+    video.resizes[`${width}x${height}`] = { processing: true }
+
+    const originalVideoPath = `./storage/${videoId}/original.${video.extension}`
+    const targetVideoPath = `./storage/${videoId}/${width}x${height}.${video.extension}`
+
+    try {
+
+        await FF.resize(
+            originalVideoPath,
+            targetVideoPath,
+            width,
+            height,
+        )
+
+        video.resizes[`${width}x${height}`].processing = false
+        db.save()
+
+        res.status(200).json({
+            status: "success",
+            message: "The video is now being processed"
+        })
+
+    } catch (error) {
+        util.deleteFile(targetVideoPath)
+        return handleErr(error)
+    }
+}
+
+// extract audio from video file (can only be done once)
 const extractAudio = async (req, res, handleErr) => {
 
     const videoId = req.params.get("videoId")
@@ -178,7 +216,8 @@ const controller = {
     getVideos,
     uploadVideo,
     getVideoAsset,
-    extractAudio
+    extractAudio,
+    resizeVideo
 }
 
 module.exports = controller

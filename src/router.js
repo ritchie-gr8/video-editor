@@ -29,9 +29,11 @@ module.exports = (server) => {
   // upload a video file
   server.route("post", "/api/upload-video", Video.uploadVideo)
 
-
   // extract audio from video file (can only be done once)
   server.route("patch", "/api/video/extract-audio", Video.extractAudio)
+
+  // resize a video file (creates a new video file)
+  server.route("put", "/api/video/resize", Video.resizeVideo)
 
   // return video asset to the client
   server.route("get", "/get-video-asset", Video.getVideoAsset)
